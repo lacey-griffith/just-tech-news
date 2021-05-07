@@ -1,21 +1,24 @@
 const router = require('express').Router();
-const { Post, User } = require('../../models');
+const { Post, User, Vote } = require('../../models');
+const sequelize = require('../../config/connection');
 
 //GET all posts
 router.get('/', (req, res) => {
     Post.findAll({
-        attributes : ['id', 'post_url', 'title', 'created_at'],
-        order: [['created_at', 'DESC']],
-        include: [
-            {
-                model: User,
-                attributes: ['username']
-            }
-        ]
+        attributes: ['id', 'post_url', 'title', 'created_at',
+        [sequelize.literal('(SELECT COUNT(*) FROM vote WHERE post.id = vote.post_id)'), 'vote_count']
+        ],
+        order: [
+            ['created_at', 'DESC']
+        ],
+        include: [{
+            model: User,
+            attributes: ['username']
+        }]
     }).then(postData => {
         res.json(postData)
     }).catch(err => {
-        res.status(500).json(err)
+        res.status(500).json({message: err})
     })
 })
 
@@ -25,14 +28,18 @@ router.get('/:id', (req, res) => {
         where: {
             id: req.params.id
         },
-        attributes: ['id', 'post_url', 'title', 'created_at'],
+        attributes: ['id', 'post_url', 'title', 'created_at',
+        [sequelize.literal('(SELECT COUNT(*) FROM vote WHERE post.id = vote.post_id)'), 'vote_count']
+        ],
         include: [{
             model: User,
             attributes: ['username']
         }]
     }).then(postData => {
-        if(!postData){
-            res.status(404).json({ message: 'No post found with this id' });
+        if (!postData) {
+            res.status(404).json({
+                message: 'No post found with this id'
+            });
             return
         }
         res.json(postData)
@@ -42,7 +49,7 @@ router.get('/:id', (req, res) => {
 })
 
 //CREATE a new post
-router.post('/', (req,res) => {
+router.post('/', (req, res) => {
     //expects {title:, post_url:, user_id:}
     Post.create({
         title: req.body.title,
@@ -55,45 +62,55 @@ router.post('/', (req,res) => {
     })
 })
 
+//VOTE on a post
+router.put('/upvote', (req, res) => {
+Post.upvote(req.body, { Vote })
+.then(updatedPostData => res.json(updatedPostData))
+.catch(err => res.status(400).json(err))
+});
+
 //UPDATE post title
 router.put('/:id', (req, res) => {
-    Post.update(
-      {
-        title: req.body.title
-      },
-      {
-        where: {
-          id: req.params.id
-        }
-      }
-    )
-      .then(dbPostData => {
-        if (!dbPostData) {
-          res.status(404).json({ message: 'No post found with this id' });
-          return;
-        }
-        res.json(dbPostData);
-      })
-      .catch(err => {
-        console.log(err);
-        res.status(500).json(err);
-      });
-  });
+    Post.update({
+            title: req.body.title
+        }, {
+            where: {
+                id: req.params.id
+            }
+        })
+        .then(dbPostData => {
+            if (!dbPostData) {
+                res.status(404).json({
+                    message: 'No post found with this id'
+                });
+                return;
+            }
+            res.json(dbPostData);
+        })
+        .catch(err => {
+            console.log(err);
+            res.status(500).json(err);
+        });
+});
 
-  //DELETE a post
-  router.delete('/:id', (req, res) => {
-      Post.destroy({
-          where: {id: req.params.id}
-      })
-      .then(postData => {
-          if(!dbPostData){
-              res.status(404).json({message: 'Post not found'})
-              return
-          }
-          res.json(postData)
-      }).catch(err => {
-          res.status(500).json(err)
-      })
-  })
+//DELETE a post
+router.delete('/:id', (req, res) => {
+    Post.destroy({
+            where: {
+                id: req.params.id
+            }
+        })
+        .then(postData => {
+            if (!dbPostData) {
+                res.status(404).json({
+                    message: 'Post not found'
+                })
+                return
+            }
+            res.json(postData)
+        }).catch(err => {
+            res.status(500).json(err)
+        })
+})
 
 module.exports = router;
