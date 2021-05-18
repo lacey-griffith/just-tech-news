@@ -100,14 +100,14 @@ router.put('/:id', (req, res) => {
                 id: req.params.id
             }
         })
-        .then(dbPostData => {
-            if (!dbPostData) {
+        .then(postData => {
+            if (!postData) {
                 res.status(404).json({
                     message: 'No post found with this id'
                 });
                 return;
             }
-            res.json(dbPostData);
+            res.json(postData);
         })
         .catch(err => {
             console.log(err);
@@ -123,7 +123,7 @@ router.delete('/:id', (req, res) => {
             }
         })
         .then(postData => {
-            if (!dbPostData) {
+            if (!postData) {
                 res.status(404).json({
                     message: 'Post not found'
                 })
